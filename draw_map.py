@@ -116,42 +116,24 @@ class drawMap():
         # Showing the plot
         plt.show()
 
-    def calculate_direction(self, line):
-        x1, y1 = line[0]
-        x2, y2 = line[1]
-        dx = x2 - x1
-        dy = y2 - y1
-        return np.arctan2(dy, dx)
-
-    def calculate_midpoint(self, line):
-        x1, y1 = line[0]
-        x2, y2 = line[1]
-        return ((x1 + x2) / 2, (y1 + y2) / 2)
-
-    def angle_between_vectors(self, v1, v2):
-        dot_product = np.dot(v1, v2)
-        norm_v1 = np.linalg.norm(v1)
-        norm_v2 = np.linalg.norm(v2)
-        return np.arccos(dot_product / (norm_v1 * norm_v2))
-
-    def filter_duplicate_lines(self, lines, tolerance=1e-1, angle_tolerance=0.2):
+    def filter_duplicate_lines(self, lines, tolerance=0.2):
         unique_lines = []
+
         for line in lines:
-            line_direction = self.calculate_direction(line)
-            line_midpoint = self.calculate_midpoint(line)
+            x1, y1 = line[0]
+            x2, y2 = line[1]
 
             is_duplicate = False
             for unique_line in unique_lines:
-                unique_line_direction = self.calculate_direction(unique_line)
-                unique_line_midpoint = self.calculate_midpoint(unique_line)
+                ux1, uy1 = unique_line[0]
+                ux2, uy2 = unique_line[1]
 
-                angle_diff = abs(line_direction - unique_line_direction)
-                if angle_diff > np.pi:
-                    angle_diff = 2 * np.pi - angle_diff
-
-                midpoint_dist = np.linalg.norm(np.array(line_midpoint) - np.array(unique_line_midpoint))
-
-                if angle_diff < angle_tolerance and midpoint_dist < tolerance:
+                if (
+                    (abs(x1 - ux1) <= tolerance and abs(y1 - uy1) <= tolerance and
+                    abs(x2 - ux2) <= tolerance and abs(y2 - uy2) <= tolerance) or
+                    (abs(x1 - ux2) <= tolerance and abs(y1 - uy2) <= tolerance and
+                    abs(x2 - ux1) <= tolerance and abs(y2 - uy1) <= tolerance)
+                ):
                     is_duplicate = True
                     break
 
@@ -159,6 +141,37 @@ class drawMap():
                 unique_lines.append(line)
 
         return unique_lines
+
+    def filter_sub_lines(self, lines, tolerance=0.2):
+        def normalize_line(line):
+            p1, p2 = sorted(line)
+            return p1, p2
+
+        def is_sub_line(small, large, tol):
+            (sx1, sy1), (sx2, sy2) = small
+            (lx1, ly1), (lx2, ly2) = large
+
+            return (
+                min(lx1, lx2) - tol <= sx1 <= max(lx1, lx2) + tol and
+                min(ly1, ly2) - tol <= sy1 <= max(ly1, ly2) + tol and
+                min(lx1, lx2) - tol <= sx2 <= max(lx1, lx2) + tol and
+                min(ly1, ly2) - tol <= sy2 <= max(ly1, ly2) + tol
+            )
+
+        normalized_lines = [normalize_line(line) for line in lines]
+        filtered_lines = []
+
+        for i, line in enumerate(normalized_lines):
+            is_subset = False
+            for j, other_line in enumerate(normalized_lines):
+                if i != j and is_sub_line(line, other_line, tolerance):
+                    is_subset = True
+                    break
+
+            if not is_subset:
+                filtered_lines.append(line)
+
+        return filtered_lines
 
     def map(self):
         """
@@ -169,12 +182,12 @@ class drawMap():
         """
 
         lines, _ = self.process_measurements()
-        self.draw_lines(lines)
-
         unique_lines = self.filter_duplicate_lines(lines)
-        self.draw_lines(unique_lines)
+        unique_lines_without_sublines = self.filter_sub_lines(unique_lines)
+        self.draw_lines(unique_lines_without_sublines)
 
         return lines
+
 
 def main():
 
