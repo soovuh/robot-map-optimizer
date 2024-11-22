@@ -91,7 +91,7 @@ class drawMap():
                     self.lengths.append(length)
 
         return self.lines, self.lengths
-    
+
 
     def draw_lines(self, filtered_points):
         """
@@ -116,6 +116,49 @@ class drawMap():
         # Showing the plot
         plt.show()
 
+    def calculate_direction(self, line):
+        x1, y1 = line[0]
+        x2, y2 = line[1]
+        dx = x2 - x1
+        dy = y2 - y1
+        return np.arctan2(dy, dx)
+
+    def calculate_midpoint(self, line):
+        x1, y1 = line[0]
+        x2, y2 = line[1]
+        return ((x1 + x2) / 2, (y1 + y2) / 2)
+
+    def angle_between_vectors(self, v1, v2):
+        dot_product = np.dot(v1, v2)
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
+        return np.arccos(dot_product / (norm_v1 * norm_v2))
+
+    def filter_duplicate_lines(self, lines, tolerance=1e-1, angle_tolerance=0.2):
+        unique_lines = []
+        for line in lines:
+            line_direction = self.calculate_direction(line)
+            line_midpoint = self.calculate_midpoint(line)
+
+            is_duplicate = False
+            for unique_line in unique_lines:
+                unique_line_direction = self.calculate_direction(unique_line)
+                unique_line_midpoint = self.calculate_midpoint(unique_line)
+
+                angle_diff = abs(line_direction - unique_line_direction)
+                if angle_diff > np.pi:
+                    angle_diff = 2 * np.pi - angle_diff
+
+                midpoint_dist = np.linalg.norm(np.array(line_midpoint) - np.array(unique_line_midpoint))
+
+                if angle_diff < angle_tolerance and midpoint_dist < tolerance:
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                unique_lines.append(line)
+
+        return unique_lines
 
     def map(self):
         """
@@ -128,13 +171,10 @@ class drawMap():
         lines, _ = self.process_measurements()
         self.draw_lines(lines)
 
-        # ------------------------------------------------------------------------------------------------
-        # TO DO: Create your own methods and add them to this function for further processing and cleaning  
-        # up the output as much as you can
-        # ------------------------------------------------------------------------------------------------
+        unique_lines = self.filter_duplicate_lines(lines)
+        self.draw_lines(unique_lines)
 
         return lines
-
 
 def main():
 
